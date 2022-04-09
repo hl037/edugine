@@ -1,7 +1,8 @@
+import math
 import pyglet
 
-from . import core
-from .core.gui import LayoutItem
+from .. import core
+from ..core.gui import LayoutItem
 
 
 
@@ -15,8 +16,7 @@ from .core.gui import LayoutItem
 #     self.size = size
 # 
 # 
-    
-    
+
 class Controller(core.Controller):
   """
   The pyglet main loop and controller.

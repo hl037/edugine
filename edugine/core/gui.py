@@ -1,5 +1,7 @@
 import math
-from dataclasses import dataclass
+import dataclasses
+from dataclasses import dataclass, fields
+from enum import Enum, IntEnum
 from contextlib import contextmanager
 
 import scipy.optimize as optim
@@ -16,6 +18,8 @@ def div(a, b):
   else :
     return a / b
 
+Geometry = tuple[int, int, int, int]
+
 @dataclass
 class _LayoutItem(object):
   """
@@ -29,7 +33,21 @@ class _LayoutItem(object):
   size_preferred : tuple[int, int] = (200,100)
   collapse : tuple[int, int] = (1,1)
   expand : tuple[int, int] = (1,1)
-  geometry : tuple[int, int, int, int] = (0,0,0,0)
+  geometry : Geometry = (0,0,0,0)
+
+
+class Alignment(IntEnum):
+  """
+  Alignment in a container
+  """
+  BEGIN = 0
+  MIDDLE = 1
+  END = 2
+  LEFT = BEGIN
+  RIGHT = END
+  BOTTOM = BEGIN
+  TOP = END
+    
   
 class LayoutItem(_LayoutItem):
   """
@@ -42,7 +60,7 @@ class LayoutItem(_LayoutItem):
     if self.ratio_preferred is None :
       self.ratio_preferred = div(*self.size_preferred)
 
-  def setGeometry(self, geometry:tuple[int, int, int, int]):
+  def setGeometry(self, geometry:Geometry):
     """
     Sets the geometry of this item, and of its children
     """
@@ -237,7 +255,7 @@ class BoxLayout(LayoutItem):
         nX[Ind[:wrong]] += 1
     return nX.astype(int)
 
-  def setGeometry(self, geometry:tuple[int, int, int, int]):
+  def setGeometry(self, geometry:Geometry):
     """
     Actually perform the layout
     """
@@ -395,4 +413,66 @@ class ConstRatioContainer(LayoutItem):
   """
   A layout item that can safely handle an item with a constant w/h ratio.
   """
-  # TODO
+  def __init__(self, item:LayoutItem, alignment=(Alignment, Alignment)):
+    self.item = item
+    item.parent = self
+    self._alignment = alignment
+    self.updateLayout()
+
+  def updateLayout(self):
+    d = dataclasses.asdict(self.item)
+    d['ratio_min'] = 0
+    d['ratio_max'] = Max
+    d['geometry'] = self.geometry
+    LayoutItem.__init__(self, **d)
+
+  def _align(self, direction, size):
+    """
+    direction = 0 -> horizontal
+    direction = 1 - vertival
+    """
+    if self.alignment[direction] == Alignment.BEGIN :
+      return self.geometry[direction]
+    elif self.alignment[direction] == Alignment.END :
+      return self.geometry[direction] + self.geometry[2+direction] - size
+    else :
+      return self.geometry[direction] + (self.geometry[2+direction] - size) // 2
+
+  def setGeometry(self, geometry:Geometry):
+    super().setGeometry(geometry)
+    self_ratio = div(*self.geometry[2:])
+    if self_ratio < self.item.ratio_min :
+      # bound by width, extra height
+      if self.geometry[2] > self.item.size_max[0] :
+        # extra width too...
+        w = self.item.size_max[0]
+      else :
+        w = self.geometry[2]
+      h = min(w / self.item.ratio_min, self.item.size_max[1])
+    elif self_ratio > self.item.ratio_max :
+      # bound by height, extra width
+      if self.geometry[3] > self.item.size_max[1] :
+        # extra height too...
+        h = self.item.size_max[1]
+      else :
+        h = self.geometry[3]
+      w = min(h * self.item.ratio_min, self.item.size_max[0])
+    else :
+      w = min(geometry[2], self.item.size_max[0])
+      h = min(geometry[3], self.item.size_max[1])
+    w = round(w)
+    h = round(h)
+    self.item.setGeometry(( self._align(0, w), self._align(1, h), w, h))
+  
+  @property
+  def alignment(self):
+    return self._alignment
+
+  @alignment.setter
+  def alignment(self, val):
+    self._alignment = val
+    self.update()
+    
+
+
+
