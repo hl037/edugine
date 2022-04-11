@@ -414,7 +414,7 @@ class ConstRatioContainer(LayoutItem):
   A layout item that can safely handle an item with a constant w/h ratio.
   """
   def __init__(self, item:LayoutItem, alignment=(Alignment, Alignment)):
-    self.item = item
+    self._item = item
     item.parent = self
     self._alignment = alignment
     self.updateLayout()
@@ -440,29 +440,30 @@ class ConstRatioContainer(LayoutItem):
 
   def setGeometry(self, geometry:Geometry):
     super().setGeometry(geometry)
+    item = self.item
     self_ratio = div(*self.geometry[2:])
-    if self_ratio < self.item.ratio_min :
+    if self_ratio < item.ratio_min :
       # bound by width, extra height
-      if self.geometry[2] > self.item.size_max[0] :
+      if self.geometry[2] > item.size_max[0] :
         # extra width too...
-        w = self.item.size_max[0]
+        w = item.size_max[0]
       else :
         w = self.geometry[2]
-      h = min(w / self.item.ratio_min, self.item.size_max[1])
-    elif self_ratio > self.item.ratio_max :
+      h = min(w / item.ratio_min, item.size_max[1])
+    elif self_ratio > item.ratio_max :
       # bound by height, extra width
-      if self.geometry[3] > self.item.size_max[1] :
+      if self.geometry[3] > item.size_max[1] :
         # extra height too...
-        h = self.item.size_max[1]
+        h = item.size_max[1]
       else :
         h = self.geometry[3]
-      w = min(h * self.item.ratio_min, self.item.size_max[0])
+      w = min(h * item.ratio_min, item.size_max[0])
     else :
-      w = min(geometry[2], self.item.size_max[0])
-      h = min(geometry[3], self.item.size_max[1])
+      w = min(geometry[2], item.size_max[0])
+      h = min(geometry[3], item.size_max[1])
     w = round(w)
     h = round(h)
-    self.item.setGeometry(( self._align(0, w), self._align(1, h), w, h))
+    item.setGeometry(( self._align(0, w), self._align(1, h), w, h))
   
   @property
   def alignment(self):
@@ -472,7 +473,102 @@ class ConstRatioContainer(LayoutItem):
   def alignment(self, val):
     self._alignment = val
     self.update()
-    
 
+  @property
+  def item(self):
+    return self._item
+  
+  @item.setter
+  def item(self, val):
+    self.item = val
+    self.update()
+    
+class PaddingContainer(LayoutItem):
+  """
+  A layout item to always add a padding to an item.
+
+  The css way is like this:
+  1 value  : All
+  2 values : Vertical, Horizontal
+  3 values : Top, Horizontal, Bottom
+  4 values : Top, Right, Bottom, Left
+
+  The margin attribute is 
+  Left, Bottom, Right, Top
+  """
+  def __init__(self, item:LayoutItem, *css:list[int], margin:tuple[int, int, int, int]=None):
+    super().__init__()
+    self._item = item
+    if margin is None :
+      self.css = css
+    else :
+      self.margin = margin
+  
+
+  def updateLayout(self):
+    item = self.item
+    mh = self.margin[0] + self.margin[2]
+    mv = self.margin[1] + self.margin[3]
+    
+    LayoutItem.__init__(self,
+      ratio_min=item.ratio_min,
+      ratio_max=item.ratio_max,
+      ratio_preferred=item.ratio_preferred,
+      size_min=(item.size_min[0] + mh, item.size_min[1] + mv),
+      size_max=(item.size_max[0] + mh, item.size_max[1] + mv),
+      size_preferred=(item.size_preferred[0] + mh, item.size_preferred[1] + mv),
+      collapse=item.collapse,
+      expand=item.expand,
+      geometry=self.geometry
+    )
+
+  def setGeometry(self, geometry:Geometry):
+    super().setGeometry(geometry)
+    x, y, w, h = geometry
+    l, b, r, t = self.margin
+    self.item.setGeometry((x + l, y + b, w - l - r, h - b - t))
+
+  @property
+  def margin(self):
+    return self._margin
+
+  @margin.setter
+  def margin(self, val):
+    self._margin = val
+    self.update()
+
+  @property
+  def css(self):
+    return tuple(reversed(self.margin))
+  
+  @css.setter
+  def css(self, val):
+    if not val :
+      self.margin = 0,0,0,0
+      return
+    if isinstance(val, int) :
+      val = val,
+    val = tuple( (0 if v is None else v) for v in val )
+    if len(val) == 1 :
+      t, = r, = b, = l, = val
+    elif len(val) == 2 :
+      t, r = b, l = val
+    elif len(val) == 3 :
+      t, r, b = val
+      l = r
+    elif len(val) == 4 :
+      t, r, b, l = val
+    else :
+      raise ValueError(f"Too much values for margin : {len(val)} > 4")
+    self.margin = l, b, r, t
+
+  @property
+  def item(self):
+    return self._item
+  
+  @item.setter
+  def item(self, val:LayoutItem):
+    self.item = val
+    self.update()
 
 

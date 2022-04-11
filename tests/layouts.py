@@ -3,7 +3,7 @@ import pyglet
 from pyglet import shapes
 from pyglet import gl
 import pyglet.window.key as K
-from edugine.core.gui import VBoxLayout, HBoxLayout, LayoutItem, ConstRatioContainer, Alignment
+from edugine.core.gui import *
 from edugine.pyglet import Controller
 import numpy as np
 
@@ -152,6 +152,51 @@ def test5():
   except :
     import pdb; pdb.xpm()
 
+@tests.append
+def test6():
+  global items
+  w = 300
+  h = 150
+  item = DummyLayoutItem(
+      color=colors[0],
+      batch=batch,
+      size_preferred=(w,h),
+      size_max=(w,h),
+      ratio_preferred = w/h,
+      ratio_min = w/h,
+      ratio_max = w/h,
+  )
+  c = PaddingContainer(item)
+  try :
+    @window.event
+    def on_resize(width, height):
+      c.setGeometry((0, 0, width, height))
+
+    @window.event
+    def on_key_press(symbol, modifiers):
+      if symbol == K.RIGHT :
+        c.margin = (*c.margin[1:], c.margin[0])
+      elif symbol == K.LEFT :
+        c.margin = (c.margin[-1], *c.margin[:-1])
+      elif symbol == K.NUM_0 :
+        c.css = None
+      elif symbol == K.NUM_1 :
+        c.css = 10
+      elif symbol == K.NUM_2 :
+        c.css = 10, 20
+      elif symbol == K.NUM_3 :
+        c.css = 10, 20, 40
+      elif symbol == K.NUM_4 :
+        c.css = 10, 20, 40, 80
+      elif symbol == K.NUM_5 :
+        c.margin = 80, 40, 20, 10
+
+  except :
+    import pdb; pdb.xpm()
+
+
+
+
 ic(sys.argv)
 
 if len(sys.argv) >= 2 :
@@ -169,13 +214,17 @@ else :
   t = False
 
 
+try :
+  if p :
+    pyglet.app.run()
+  elif t :
+    c.runInThread()
+  else :
+    c.loop()
+except :
+  import pdb; pdb.xpm()
+  
 
-if p :
-  pyglet.app.run()
-elif t :
-  c.runInThread()
-else :
-  c.loop()
 
 
 
