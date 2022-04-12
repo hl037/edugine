@@ -100,6 +100,19 @@ class LayoutItem(_LayoutItem):
     it._parent = None
 
 
+def round_maintain_sum(X:np.ndarray):
+  s = int(round(np.sum(X)))
+  nX = np.round(X)
+  ns = int(round(np.sum(nX)))
+  wrong = ns - s
+  if wrong != 0 :
+    Ind = np.argsort(nX - X)
+    if wrong < 0 :
+      nX[Ind[wrong:]] += 1
+    else :
+      nX[Ind[:wrong]] += 1
+  return nX.astype(int)
+
 
 
 class BoxLayout(LayoutItem):
@@ -242,19 +255,6 @@ class BoxLayout(LayoutItem):
     A &= ~Bmask
     return A, r
 
-  def _round_maintain_sum(self, X:np.ndarray):
-    s = int(round(np.sum(X)))
-    nX = np.round(X)
-    ns = int(round(np.sum(nX)))
-    wrong = ns - s
-    if wrong != 0 :
-      Ind = np.argsort(nX - X)
-      if wrong < 0 :
-        nX[Ind[wrong:]] += 1
-      else :
-        nX[Ind[:wrong]] += 1
-    return nX.astype(int)
-
   def setGeometry(self, geometry:Geometry):
     """
     Actually perform the layout
@@ -286,7 +286,7 @@ class BoxLayout(LayoutItem):
       A, space = self._share_space(space, X, A, B, C)
     # ic('Layed out')
     # ic(X)
-    X = self._round_maintain_sum(X)
+    X = round_maintain_sum(X)
     # ic(X)
 
     # C0 = np.divide(1, coefs, out=np.zeros_like(coefs), where=coefs!=0)
@@ -571,4 +571,110 @@ class PaddingContainer(LayoutItem):
     self.item = val
     self.update()
 
+
+class PaddingFracContainer(LayoutItem):
+  """
+  A layout item to always add a padding to an item, as a fraction of available space
+
+  The css way is like this:
+  1 value  : All
+  2 values : Vertical, Horizontal
+  3 values : Top, Horizontal, Bottom
+  4 values : Top, Right, Bottom, Left
+
+  The margin attribute is 
+  Left, Bottom, Right, Top
+  """
+  def __init__(self, item:LayoutItem, *css:list[float], margin:tuple[float, float, float, float]=None):
+    super().__init__()
+    self._item = item
+    if margin is None :
+      self.css = css
+    else :
+      self.margin = margin
+  
+
+  def updateLayout(self):
+    item = self.item
+
+    LayoutItem.__init__(self,
+      ratio_min=item.ratio_min * self.ratio_coef,
+      ratio_max=item.ratio_max * self.ratio_coef,
+      ratio_preferred=item.ratio_preferred * self.ratio_coef,
+      size_min=self.applyStretch(item.size_min),
+      size_max=self.applyStretch(item.size_max),
+      size_preferred=self.applyStretch(item.size_preferred),
+      collapse=item.collapse,
+      expand=item.expand,
+      geometry=self.geometry
+    )
+
+  def applyStretch(self, size:tuple[float, float]):
+    w, h = size
+    cw, ch = self.size_frac[2:]
+    w *= cw
+    h *= ch
+    if w != Max :
+      w = round(w)
+    if h != Max :
+      h = round(h)
+    return w, h
+  
+  def applyMargin(self, geometry:Geometry):
+    x, y, w, h = geometry
+    cl, cb, cw, ch = self.size_frac
+    return round(x + cl * w), round(y + cb * h), round(cw * w), round(ch * h)
+
+  def setGeometry(self, geometry:Geometry):
+    super().setGeometry(geometry)
+    self.item.setGeometry(self.applyMargin(geometry))
+
+  @property
+  def margin(self):
+    return self._margin
+
+  @margin.setter
+  def margin(self, val):
+    if val[0] + val[2] >= 1 :
+      raise ValueError(f'Horizontal margin sum {val[0] + val[3]} is greater or equal to 1. This imply the contained item cannot have a valid width')
+    if val[1] + val[3] >= 1 :
+      raise ValueError(f'Vertical margin sum {val[0] + val[3]} is greater or equal to 1. This imply the contained item cannot have a valid height')
+    self._margin = val
+    self.size_frac = val[0], val[1], (1 - val[0] - val[2]), (1 - val[1] - val[3]) 
+    self.ratio_coef = self.size_frac[3] / self.size_frac[2]
+    self.update()
+
+  @property
+  def css(self):
+    return tuple(reversed(self.margin))
+  
+  @css.setter
+  def css(self, val):
+    if not val :
+      self.margin = 0.,0.,0.,0.
+      return
+    if isinstance(val, float) :
+      val = val,
+    val = tuple( (0. if v is None else v) for v in val )
+    if len(val) == 1 :
+      t, = r, = b, = l, = val
+    elif len(val) == 2 :
+      t, r = b, l = val
+    elif len(val) == 3 :
+      t, r, b = val
+      l = r
+    elif len(val) == 4 :
+      t, r, b, l = val
+    else :
+      raise ValueError(f"Too much values for margin : {len(val)} > 4")
+    self.margin = l, b, r, t
+
+  @property
+  def item(self):
+    return self._item
+  
+  @item.setter
+  def item(self, val:LayoutItem):
+    self.item = val
+    self.update()
 

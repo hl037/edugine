@@ -1,9 +1,12 @@
 import time
 from pathlib import Path
 from dataclasses import dataclass
+import typing
 import numpy as np
 
 from .. import core
+
+from ...core import Pos, Pos_t
 
 CellHandler = typing.Callable[[Pos_t], None]
 
@@ -11,7 +14,7 @@ class Cell(object):
   """
   A cell model for a grid
   """
-  def __init__(self, grid:Grid, pos:core.Pos_t):
+  def __init__(self, grid:'Grid', pos:Pos_t):
     self.grid = grid
     self.pos = pos
     self.visuals = set() # type: list[Visual]
@@ -22,6 +25,17 @@ class Cell(object):
 
   def update(self):
     grid.cellUpdate(pos)
+
+  @property
+  def all_visuals(self):
+    return list(self.visuals) + [ v for e in self.entities for v in e.visuals ]
+
+  def __add__(self, pos:Pos_t):
+    if not isinstance(pos, Pos_t) :
+      raise TypeError('not a position')
+    return self.grid.cell(self.pos + pos)
+
+      
 
 
 class Grid(object):
@@ -44,6 +58,15 @@ class Grid(object):
       cb(pos)
 
   onCellUpdate = addCellUpdateListener
+  
+  def cell(self, pos:Pos_t):
+    x, y = pos
+    x_count, y_count = self.g.shape
+    if 0 <= x < x_count and 0 <= y <= y_count:
+      return self.g[x, y]
+    else :
+      return None
+      
 
 
 class CellGrid(np.ndarray):
@@ -53,7 +76,7 @@ class CellGrid(np.ndarray):
 
   def __new__(
       subtype, shape, dtype=Cell, buffer=None, offset=0,
-      strides=None, order=None
+      strides=None, order=None, parent=None
   ):
     if len(shape) != 2 :
       raise RuntimeError('A grid cannot be other than 2-dimensionnal')
@@ -63,36 +86,26 @@ class CellGrid(np.ndarray):
       subtype, shape, dtype,
       buffer, offset, strides, order
     )
-    self[:] = [ [ Cell(self, Pos(x, y)) for y in range(h) ] for x in range(w) ]
+    if parent is not None :
+      h, w = shape
+      obj[:] = [ [ Cell(parent, Pos(x, y)) for y in range(h) ] for x in range(w) ]
     return obj
 
   @classmethod
   def create(cls, shape):
     return cls(shape)
 
-  @property
-  def w(self):
-    return self.g.shape[0]
-
-  @property
-  def h(self):
-    return self.g.shape[1]
-  
   def __getitem__(self, k):
-    if isinstance(k, _Pos) :
+    if isinstance(k, Pos_t) :
       return super().__getitem__((k[0], k[1]))
     else :
       return super().__getitem__(k)
 
   def __setitem__(self, k, v):
-    if isinstance(k, _Pos) :
+    if isinstance(k, Pos_t) :
       return super().__setitem__((k[0], k[1]), v)
     else :
       return super().__setitem__(k, v)
-
-  @property
-  def dirty(self):
-    return ( c.dirty for c in np.nditer(self) )
 
   def __getattr__(self, k):
     return np.vectorize(lambda x: getattr(x, k), object)(self)
@@ -102,39 +115,25 @@ class CellGrid(np.ndarray):
       np.frompyfunc(lambda x: setattr(x, k, v), nin=1, nout=0)(self)
     
 
-class Visual(object):
-  #TODO
-  """
-  Class permitting to load images
-  """
-  def __init__(self, path, z=0):
-    super().__init__()
-    self.path = path
-    self.z = z
 
-  def load(self, path):
-    raise NotImplementedError()
+_visual_count = 0
 
-  @property
-  def _cell_list(self):
-    return self._cell.visuals
+def Visual():
+  global _visual_count
+  rv = _visual_count
+  _visual_count += 1
 
 
-class Entity(CellItem):
+class Entity(object):
   """
   Class to represent an object, a character etc.
   Note : it is important to flag the cell as dirty when changing features or visuals
   """
 
-  _id_count = 0
-
   def __init__(self, cell:Cell = None):
     if not hasattr(self, 'visuals') :
       self.visuals = []
     self._cell = None
-    self._id = self.__class__._id_count
-    self.__class__._id_count += 1
-
     self.cell = cell
     
   @property
@@ -154,10 +153,13 @@ class Entity(CellItem):
     self._cell = new_cell
     if self._cell :
       self._cell.entities.add(self)
-      self._cell.update
+      self._cell.update()
 
   def removeFromCell(self, cell:Cell):
     self.addToCell(None)
+
+  def __getattr__(self, k):
+    return None
     
 
 class View(object):

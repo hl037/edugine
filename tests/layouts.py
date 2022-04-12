@@ -3,8 +3,8 @@ import pyglet
 from pyglet import shapes
 from pyglet import gl
 import pyglet.window.key as K
-from edugine.core.gui import *
 from edugine.pyglet import Controller
+from edugine.core.gui import *
 import numpy as np
 
 import sys
@@ -194,6 +194,47 @@ def test6():
   except :
     import pdb; pdb.xpm()
 
+@tests.append
+def test7():
+  global items
+  w = 300
+  h = 150
+  item = DummyLayoutItem(
+      color=colors[0],
+      batch=batch,
+      size_preferred=(w,h),
+      size_max=(w,h),
+      ratio_preferred = w/h,
+      ratio_min = w/h,
+      ratio_max = w/h,
+  )
+  c = PaddingFracContainer(item)
+  try :
+    @window.event
+    def on_resize(width, height):
+      c.setGeometry((0, 0, width, height))
+
+    @window.event
+    def on_key_press(symbol, modifiers):
+      if symbol == K.RIGHT :
+        c.margin = (*c.margin[1:], c.margin[0])
+      elif symbol == K.LEFT :
+        c.margin = (c.margin[-1], *c.margin[:-1])
+      elif symbol == K.NUM_0 :
+        c.css = None
+      elif symbol == K.NUM_1 :
+        c.css = .10
+      elif symbol == K.NUM_2 :
+        c.css = .10, .20
+      elif symbol == K.NUM_3 :
+        c.css = .10, .20, .40
+      elif symbol == K.NUM_4 :
+        c.css = .05, .10, .20, .40
+      elif symbol == K.NUM_5 :
+        c.margin = .40, .20, .10, .05
+
+  except :
+    import pdb; pdb.xpm()
 
 
 

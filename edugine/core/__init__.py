@@ -5,8 +5,12 @@ from collections import defaultdict
 from threading import Thread
 import numpy as np
 
-import edugine.mouse as M
-import edugine.keyboard as K
+try :
+  import edugine.mouse as M
+  import edugine.keyboard as K
+except :
+  raise ImportError('Please import a backend before importing core modules')
+  
 
 class Pos_t(np.ndarray):
   """
@@ -57,11 +61,11 @@ class Controller(object):
     self.tread = None
     self.fps = 60
     self.running = True
-    self.keyDownListeners = defaultdict(default_factory=lambda : [])
-    self.keyUpListeners = defaultdict(default_factory=lambda : [])
+    self.keyDownListeners = defaultdict(lambda : [])
+    self.keyUpListeners = defaultdict(lambda : [])
     self.tickListener = []
-    self.mouseDownListeners = defaultdict(default_factory=lambda : [])
-    self.mouseUpListeners = defaultdict(default_factory=lambda : [])
+    self.mouseDownListeners = defaultdict(lambda : [])
+    self.mouseUpListeners = defaultdict(lambda : [])
     self.cur_time = None
     
   
@@ -109,30 +113,46 @@ class Controller(object):
     raise NotImplementedError()
 
   # KeyDown
-  def addKeyDownListener(self, key:int|None, cb:KeyboardHandler):
-    self.keyDownListeners[key].append(cb)
+  def addKeyDownListener(self, cb:KeyboardHandler, *keys:(int|None)):
+    if not keys :
+      keys = [None]
+    for k in keys :
+      self.keyDownListeners[k].append(cb)
+    return cb
     
-  def removeKeyDownListener(self, key:int|None, cb:KeyboardHandler):
-    self.keyDownListeners[key].remove(cb)
+  def removeKeyDownListener(self, cb:KeyboardHandler, *keys:(int|None)):
+    if not keys :
+      keys = [None]
+    for k in keys :
+      self.keyDownListeners[k].remove(cb)
+    return cb
 
-  def onKeyDown(self, key:int):
-    return lambda f: self.addKeyDownListener(key, f)
+  def onKeyDown(self, *keys:int):
+    return lambda f: self.addKeyDownListener(f, *keys)
 
-  def keyDown(self, key:int):
+  def keyDown(self, *key:int):
     for cb in self.keyDownListeners[None] :
       cb(key)
     for cb in self.keyDownListeners[key] :
       cb(key)
   
   #KeyUp
-  def addKeyUpListener(self, key:int, cb:KeyboardHandler):
-    self.keyUpListeners[key].append(cb)
+  def addKeyUpListener(self, cb:KeyboardHandler, *keys:(int|None)):
+    if not keys :
+      keys = [None]
+    for k in keys :
+      self.keyUpListeners[k].append(cb)
+    return cb
     
-  def removeKeyUpListener(self, key:int, cb:KeyboardHandler):
-    self.keyUpListeners[key].remove(cb)
+  def removeKeyUpListener(self, cb:KeyboardHandler, *keys:(int|None)):
+    if not keys :
+      keys = [None]
+    for k in keys :
+      self.keyUpListeners[k].remove(cb)
+    return cb
 
-  def onKeyUp(self, key:int):
-    return lambda f: self.addKeyUpListener(key, f)
+  def onKeyUp(self, *keys:int):
+    return lambda f: self.addKeyUpListener(f, *key)
   
   def keyUp(self, key:int):
     for cb in self.keyUpListeners[None] :
@@ -141,55 +161,61 @@ class Controller(object):
       cb(key)
   
   # MouseDown
-  def addMouseDownListener(self, buttons:int|None, cb:MouseboardHandler):
+  def addMouseDownListener(self, cb:MouseHandler, buttons:int|None=None):
     if buttons is None :
       buttons = M.ALL
     for b in (M.LEFT, M.RIGHT, M.LEFT) :
       if buttons & b :
         self.mouseDownListeners[b].append(cb)
+    return cb
     
-  def removeMouseDownListener(self, buttons:int|None, cb:MouseboardHandler):
+  def removeMouseDownListener(self, cb:MouseHandler, buttons:int|None=None):
     if buttons is None :
       buttons = M.ALL
     for b in (M.LEFT, M.RIGHT, M.LEFT) :
       if buttons & b :
         self.mouseDownListeners[b].discard(cb)
+    return cb
 
   def onMouseDown(self, buttons:int):
-    return lambda f: self.addMouseDownListener(buttons, f)
+    return lambda f: self.addMouseDownListener(f, buttons)
 
   def mouseDown(self, button:int):
     for cb in self.mouseDownListeners[button] :
       cb(button)
   
   #MouseUp
-  def addMouseUpListener(self, buttons:int, cb:MouseboardHandler):
+  def addMouseUpListener(self, cb:MouseHandler, buttons:int|None=None):
     if buttons is None :
       buttons = M.ALL
     for b in (M.LEFT, M.RIGHT, M.LEFT) :
       if buttons & b :
         self.mouseUpListeners[b].append(cb)
+    return cb
     
-  def removeMouseUpListener(self, buttons:int, cb:MouseboardHandler):
+  def removeMouseUpListener(self, cb:MouseHandler, buttons:int|None=None):
     if buttons is None :
       buttons = M.ALL
     for b in (M.LEFT, M.RIGHT, M.LEFT) :
       if buttons & b :
         self.mouseUpListeners[b].discard(cb)
+    return cb
 
   def onMouseUp(self, buttons:int):
-    return lambda f: self.addMouseUpListener(buttons, f)
+    return lambda f: self.addMouseUpListener(f, buttons)
   
-  def mouseUp(self, buttons:int):
+  def mouseUp(self, button:int):
     for cb in self.mouseUpListeners[button] :
       cb(button)
   
   #Tick
   def addTickListener(self, cb):
     self.mouseUpListeners.append(cb)
+    return cb
     
   def removeTickListener(self, cb):
     self.mouseUpListeners.remove(cb)
+    return cb
 
   def onTick(self):
     return lambda f: self.addTickListener(f)

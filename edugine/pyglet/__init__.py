@@ -20,11 +20,13 @@ class Window(pyglet.window.Window):
   """
   A window
   """
-  def __init__(self, controller:core.Controller, size = (800,600), caption:str=None, layout:LayoutItem=None):
+  def __init__(self, controller:core.Controller, size = (800,600), caption:str='Edugine', scene=None, layout:LayoutItem=None):
     self.controller = controller
-    controller.isKeyDown
-    self.layout = layout
     super().__init__(*size, caption=caption, resizable=True)
+    self.layout = layout
+    if scene is None :
+      scene = pyglet.graphics.Batch()
+    self.scene = scene
     self.keys = K.KeyStateHandler()
     self.push_handlers(self.keys)
     self.controller.isKeyDown = self.isKeyDown
@@ -50,9 +52,30 @@ class Window(pyglet.window.Window):
   def isKeyDown(self, symbol):
     return self.keys[symbol]
 
-  def on_mouse_press(self, x, y, buttons, modifiers):
-    self.mou
+  def on_mouse_press(self, x, y, button, modifiers):
+    self.controller.mouseDown(Pos(x, y), button)
+
+  def on_mouse_release(self, x, y, button, modifiers):
+    self.controller.mouseUp(Pos(x, y), button)
     
+  def setScene(self, scene:pyglet.graphics.Batch):
+    self.scene = scene
+
+  def on_draw(self):
+    self.clear()
+    if self.scene :
+      self.scene.draw()
+
+  @property
+  def layout(self) -> LayoutItem:
+    return self._layout
+  
+  @layout.setter
+  def layout(self, val:LayoutItem):
+    self._layout = val
+    if val :
+      self.set_minimum_size(*( x if x != gui.Max else 536870912 for x in self._layout.size_min))
+      self.set_maximum_size(*( x if x != gui.Max else 536870912 for x in self._layout.size_max))
 
 
 
