@@ -5,13 +5,13 @@ from collections import defaultdict
 from threading import Thread
 import numpy as np
 
+
 try :
   import edugine.mouse as M
   import edugine.keyboard as K
 except :
   raise ImportError('Please import a backend before importing core modules')
   
-
 class Pos_t(np.ndarray):
   """
   A position class that supports arithmetic operations
@@ -97,7 +97,8 @@ class Controller(object):
     due_time = base + self._spf
 
     while self.running :
-      self.tick(due_time - base)
+      #self.tick(due_time - base)
+      self.tick(self._spf)
       self.render()
       if cur_time < due_time :
         self.render()
@@ -130,7 +131,7 @@ class Controller(object):
   def onKeyDown(self, *keys:int):
     return lambda f: self.addKeyDownListener(f, *keys)
 
-  def keyDown(self, *key:int):
+  def keyDown(self, key:int):
     for cb in self.keyDownListeners[None] :
       cb(key)
     for cb in self.keyDownListeners[key] :
@@ -180,9 +181,9 @@ class Controller(object):
   def onMouseDown(self, buttons:int):
     return lambda f: self.addMouseDownListener(f, buttons)
 
-  def mouseDown(self, button:int):
+  def mouseDown(self, pos:Pos_t, button:int):
     for cb in self.mouseDownListeners[button] :
-      cb(button)
+      cb(pos, button)
   
   #MouseUp
   def addMouseUpListener(self, cb:MouseHandler, buttons:int|None=None):
@@ -204,9 +205,9 @@ class Controller(object):
   def onMouseUp(self, buttons:int):
     return lambda f: self.addMouseUpListener(f, buttons)
   
-  def mouseUp(self, button:int):
+  def mouseUp(self, pos:Pos_t, button:int):
     for cb in self.mouseUpListeners[button] :
-      cb(button)
+      cb(pos, button)
   
   #Tick
   def addTickListener(self, cb):
@@ -231,6 +232,9 @@ class Controller(object):
   def runInThread(self):
     self.thread = Thread(target=self.loop)
     self.thread.start()
+
+  def run(self):
+    self.loop()
 
   
 

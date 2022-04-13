@@ -13,6 +13,9 @@ from ... import core as core
 
 import numpy as np
 import pyglet
+from pyglet import gl
+
+from icecream import ic
 
 Grid = grid_models.Grid
 
@@ -39,7 +42,7 @@ class Sprite(object):
 
   def setGeometry(self, geometry:Geometry):
     x, y, w, h = geometry
-    self.sprite.update(x, y, None, None, w / self.size[0], h / self.size[2])
+    self.sprite.update(x, y, None, None, w / self.size[0], h / self.size[1])
 
   def destroy(self):
     self.sprite.delete()
@@ -63,6 +66,12 @@ class Atlas(object):
     )
 
 
+class RetroOrderedGroup(pyglet.graphics.OrderedGroup):
+  def set_state(self):
+    super().set_state()
+    gl.glEnable(gl.GL_TEXTURE_2D)
+    gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_NEAREST)
+    
 
 class VisualProvider(object):
   """
@@ -71,10 +80,10 @@ class VisualProvider(object):
   def __init__(self, paths:typing.Sequence[Path]):
     self.loader = pyglet.resource.Loader(list(paths))
     self.associated = dict()
-    self.groups = [ pyglet.graphics.OrderedGroup(i) for i in range(6) ]
+    self.groups = [ RetroOrderedGroup(i) for i in range(6) ]
 
   def associateVisual(self, name:str, visual:int, z=0):
-    self.associateTextureVisual(self.loader.texture(name), visual, z)
+    self.associateTextureVisual(self.loader.image(name), visual, z)
 
   def associateTextureVisual(self, texture:pyglet.image.Texture, visual:int, z=0):
     self.associated[visual] = (texture, z)
@@ -84,7 +93,7 @@ class VisualProvider(object):
 
   def getSprite(self, visual:int, batch:pyglet.graphics.Batch):
     tex, z = self.associated[visual]
-    return Sprite(tex, batch, self.groups[6])
+    return Sprite(tex, batch, self.groups[z])
   
 
 class GridCellView(gui.LayoutItem):
@@ -94,6 +103,8 @@ class GridCellView(gui.LayoutItem):
   def __init__(self, ratio, size_preferred, size_min, size_max):
     super().__init__(
       ratio_preferred=ratio,
+      ratio_min=ratio,
+      ratio_max=ratio,
       size_preferred=size_preferred,
       size_min=size_min,
       size_max=size_max,
@@ -121,8 +132,8 @@ class GridView(gui.LayoutItem):
   """
   def __init__(self,
     model:grid_models.Grid,
-    batch:pyglet.graphics.Batch,
     visualProvider:VisualProvider,
+    batch:pyglet.graphics.Batch,
     cell_ratio:float=1.0,
     cell_size_preferred=(32,32),
     cell_size_min=None,
@@ -131,8 +142,8 @@ class GridView(gui.LayoutItem):
   ):
     self.model = model
     self.model.addCellUpdateListener(self.cellUpdate)
-    self.batch = batch
     self.visualProvider = visualProvider
+    self.batch = batch
     if not margin :
       margin = .02
     self.cellSize = (0,0)
@@ -140,24 +151,25 @@ class GridView(gui.LayoutItem):
     self.grid = np.array([
       [
         gui.PaddingFracContainer(GridCellView(cell_ratio, cell_size_preferred, cell_size_min, cell_size_max), margin)
-        for j in range(model.g.shape[0])
+        for j in range(model.g.shape[1])
       ]
-      for i in range(model.g.shape[1])
+      for i in range(model.g.shape[0])
     ])
     
     base = self.grid[0,0] # type: PaddingFracContainer
     y_count, x_count = self.grid.shape
+    ratio_f = x_count / y_count
     super().__init__(
-      ratio_min = base.ratio_min,
-      ratio_max = base.ratio_max,
-      ratio_preferred = base.ratio_preferred,
+      ratio_min = base.ratio_min * ratio_f,
+      ratio_max = base.ratio_max * ratio_f,
+      ratio_preferred = base.ratio_preferred * ratio_f,
       size_min = (base.size_min[0] * x_count, base.size_min[1] * y_count),
       size_max = (base.size_max[0] * x_count, base.size_max[1] * y_count),
       size_preferred = (base.size_preferred[0] * x_count, base.size_preferred[1] * y_count),
     )
 
   def cellUpdate(self, pos:Pos_t):
-    self.grid[pos[0],pos[1]].item.replaceSprites( self.visualProvider.getSprite(v) for v in self.model.g[pos[0], pos[1]].all_visuals )
+    self.grid[pos[0],pos[1]].item.replaceSprites( self.visualProvider.getSprite(v, self.batch) for v in self.model.g[pos[0], pos[1]].all_visuals )
   
   def setGeometry(self, geometry:Geometry):
     super().setGeometry(geometry)
@@ -174,13 +186,13 @@ class GridView(gui.LayoutItem):
     next(it)
     self.offsets_y = list(it)
 
-    cy = y
-    for R, ch in zip(self.grid, h_sizes) :
-      cx = x
-      for c, cw in zip(R, w_sizes) : # type: PaddingFracContainer, float
+    cx = x
+    for R, cw in zip(self.grid, w_sizes) :
+      cy = y
+      for c, ch in zip(R, h_sizes) : # type: PaddingFracContainer, float
         c.setGeometry((cx, cy, cw, ch))
-        cx += cw
-      cy += ch
+        cy += ch
+      cx += cw
 
   def mapToCell(self, pos:Pos_t) -> Pos_t:
     px, py = pos
@@ -243,7 +255,7 @@ class GridGame(object):
       infoLayout.addItem(gui.ConstRatioContainer(self.infoM, (gui.Alignment.MIDDLE, gui.Alignment.MIDDLE)))
       infoLayout.addItem(gui.ConstRatioContainer(self.infoR, (gui.Alignment.RIGHT, gui.Alignment.MIDDLE)))
 
-    self.view = GridView(model, window.scene, visualProvider,
+    self.view = GridView(model, visualProvider, window.scene,
       cell_ratio=cell_ratio,
       cell_size_preferred=cell_size_preferred,
       cell_size_min=cell_size_min,

@@ -10,6 +10,8 @@ from ...core import Pos, Pos_t
 
 CellHandler = typing.Callable[[Pos_t], None]
 
+from icecream import ic
+
 class Cell(object):
   """
   A cell model for a grid
@@ -20,18 +22,22 @@ class Cell(object):
     self.visuals = set() # type: list[Visual]
     self.entities = set() #type: set[Entity]
 
-  def __getattr__(self, k):
+  def __getattr__(self, k:str):
+    if k.startswith('__'):
+      raise AttributeError(k)
     return None
 
   def update(self):
-    grid.cellUpdate(pos)
+    self.grid.cellUpdate(self.pos)
 
   @property
   def all_visuals(self):
     return list(self.visuals) + [ v for e in self.entities for v in e.visuals ]
 
   def __add__(self, pos:Pos_t):
-    if not isinstance(pos, Pos_t) :
+    if isinstance(pos, tuple) :
+      pos = Pos(*pos)
+    elif not isinstance(pos, Pos_t) :
       raise TypeError('not a position')
     return self.grid.cell(self.pos + pos)
 
@@ -43,7 +49,7 @@ class Grid(object):
   A Grid model
   """
   def __init__(self, shape:tuple[int, int]):
-    self.g = CellGrid.create(shape)
+    self.g = CellGrid.create(shape, self)
     self.cellUpdateListeners = set() # type: set[CellUpdateHandler]
 
     
@@ -59,20 +65,20 @@ class Grid(object):
 
   onCellUpdate = addCellUpdateListener
   
-  def cell(self, pos:Pos_t):
+  def cell(self, pos:Pos_t) -> Cell:
     x, y = pos
     x_count, y_count = self.g.shape
-    if 0 <= x < x_count and 0 <= y <= y_count:
+    if 0 <= x < x_count and 0 <= y < y_count:
       return self.g[x, y]
     else :
       return None
-      
+
+  def __getitem__(self, k):
+    return self.g.__getitem__(k)
+
 
 
 class CellGrid(np.ndarray):
-  """
-  Hold a game grid
-  """
 
   def __new__(
       subtype, shape, dtype=Cell, buffer=None, offset=0,
@@ -87,13 +93,13 @@ class CellGrid(np.ndarray):
       buffer, offset, strides, order
     )
     if parent is not None :
-      h, w = shape
-      obj[:] = [ [ Cell(parent, Pos(x, y)) for y in range(h) ] for x in range(w) ]
+      w, h = shape
+      obj[...] = [ [ Cell(parent, Pos(x, y)) for y in range(h) ] for x in range(w) ]
     return obj
 
   @classmethod
-  def create(cls, shape):
-    return cls(shape)
+  def create(cls, shape, parent):
+    return cls(shape, parent=parent)
 
   def __getitem__(self, k):
     if isinstance(k, Pos_t) :
@@ -108,7 +114,7 @@ class CellGrid(np.ndarray):
       return super().__setitem__(k, v)
 
   def __getattr__(self, k):
-    return np.vectorize(lambda x: getattr(x, k), object)(self)
+    return np.frompyfunc(lambda x: getattr(x, k), nin=1, nout=1)(self)
 
   def __setattr__(self, k, v):
     if k not in self.__dict__ :
@@ -122,6 +128,7 @@ def Visual():
   global _visual_count
   rv = _visual_count
   _visual_count += 1
+  return rv
 
 
 class Entity(object):
@@ -131,7 +138,7 @@ class Entity(object):
   """
 
   def __init__(self, cell:Cell = None):
-    if not hasattr(self, 'visuals') :
+    if not hasattr(self.__class__, 'visuals') :
       self.visuals = []
     self._cell = None
     self.cell = cell
@@ -160,7 +167,6 @@ class Entity(object):
 
   def __getattr__(self, k):
     return None
-    
 
 class View(object):
   """

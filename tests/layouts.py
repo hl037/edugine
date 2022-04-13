@@ -242,7 +242,7 @@ ic(sys.argv)
 
 if len(sys.argv) >= 2 :
   id = int(sys.argv[1]) - 1
-  assert (1 <= id <= len(tests)),  'id should be less than {len(tests)}'
+  assert (0 <= id < len(tests)),  'id should be less than {len(tests)}'
   tests[id]()
 
 if len(sys.argv) >= 3 :

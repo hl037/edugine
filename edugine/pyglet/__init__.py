@@ -4,6 +4,8 @@ import math
 import pyglet
 import pyglet.window.key as K
 import pyglet.window.mouse as M
+from pyglet import gl
+
 sys.modules['edugine.keyboard'] = K
 sys.modules['edugine.mouse'] = M
 M.ALL = M.LEFT & M.MIDDLE & M.RIGHT
@@ -11,8 +13,10 @@ M.ALL = M.LEFT & M.MIDDLE & M.RIGHT
 
 
 from .. import core
-from ..core.gui import LayoutItem
+from ..core import Pos, Pos_t
+from ..core.gui import LayoutItem, Geometry
 
+from icecream import ic
 
 
 
@@ -40,6 +44,7 @@ class Window(pyglet.window.Window):
     self.set_size(*val)
 
   def on_resize(self, width, height):
+    super().on_resize(width, height)
     if self.layout :
       self.layout.setGeometry((0, 0, width, height))
 
@@ -83,8 +88,8 @@ class Controller(core.Controller):
   """
   The pyglet main loop and controller.
   """
-  def tick(self, due_time):
-    super().tick(due_time)
+  def tick(self, dt):
+    super().tick(dt)
     pyglet.clock.tick()
 
   def render(self):
@@ -93,5 +98,11 @@ class Controller(core.Controller):
       window.dispatch_events()
       window.dispatch_event('on_draw')
       window.flip()
+
+  def run(self):
+    pyglet.clock.schedule_interval(super().tick, self.spf)
+    pyglet.app.run()
     
+    
+
     
