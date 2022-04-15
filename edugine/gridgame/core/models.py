@@ -34,6 +34,19 @@ class Cell(object):
   def all_visuals(self):
     return list(self.visuals) + [ v for e in self.entities for v in e.visuals ]
 
+  @property
+  def visuals(self):
+    return self._visuals
+  
+  @visuals.setter
+  def visuals(self, val):
+    ic(val)
+    if isinstance(val, int) :
+      val = (val,)
+    if val is None :
+      val = tuple()
+    self._visuals = set(val)
+
   def __add__(self, pos:Pos_t):
     if isinstance(pos, tuple) :
       pos = Pos(*pos)
@@ -76,18 +89,19 @@ class Grid(object):
   def __getitem__(self, k):
     return self.g.__getitem__(k)
 
+  def __setitem__(self, k, v):
+    return self.g.__setitem__(k, v)
+
 
 
 class CellGrid(np.ndarray):
 
   def __new__(
-      subtype, shape, dtype=Cell, buffer=None, offset=0,
+      subtype, shape, dtype=object, buffer=None, offset=0,
       strides=None, order=None, parent=None
   ):
     if len(shape) != 2 :
       raise RuntimeError('A grid cannot be other than 2-dimensionnal')
-    if not issubclass(dtype, Cell) :
-      raise RuntimeError('A grid can only hold Cells')
     obj = super().__new__(
       subtype, shape, dtype,
       buffer, offset, strides, order
@@ -117,8 +131,14 @@ class CellGrid(np.ndarray):
     return np.frompyfunc(lambda x: getattr(x, k), nin=1, nout=1)(self)
 
   def __setattr__(self, k, v):
+    ic(v)
     if k not in self.__dict__ :
-      np.frompyfunc(lambda x: setattr(x, k, v), nin=1, nout=0)(self)
+      np.frompyfunc(lambda x, y: setattr(x, k, y), nin=2, nout=0)(self, v)
+
+  def __call__(self, *args, **kwargs):
+    np.frompyfunc(lambda x: x(*args, **kwargs), nin=1, nout=1)(self)
+
+  
     
 
 
@@ -148,7 +168,11 @@ class Entity(object):
     return self._cell
 
   @cell.setter
-  def cell(self, new_cell:Cell):
+  def cell(self, new_cell:Cell|Pos_t):
+    if isinstance(new_cell, tuple) :
+      new_cell = self.cell.grid.cell(Pos(new_cell))
+    elif isinstance(new_cell, Pos_t) :
+      new_cell = self.cell.grid.cell(new_cell)
     self.addToCell(new_cell)
 
   def addToCell(self, new_cell:Cell):
@@ -165,8 +189,23 @@ class Entity(object):
   def removeFromCell(self, cell:Cell):
     self.addToCell(None)
 
+  def update(self):
+    if self.cell is not None :
+      self.cell.update()
+
   def __getattr__(self, k):
     return None
+  
+  def __iadd__(self, pos:Pos_t):
+    if self.cell is not None :
+      self.cell = self.cell + pos
+    return self
+
+  move = __iadd__
+
+  @property
+  def pos(self):
+    return self.cell.pos if self.pos is not None else None
 
 class View(object):
   """

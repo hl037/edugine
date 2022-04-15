@@ -44,6 +44,10 @@ class Pos_t(np.ndarray):
   def y(self, val):
     self[1] = val
 
+  def __eq__(self, oth):
+    if isinstance(oth, (Pos_t, tuple)) :
+      return self[0] == oth[0] and self[1] == oth[1]
+
 def Pos(x, y):
   p = Pos_t()
   p[:] = (x, y)
