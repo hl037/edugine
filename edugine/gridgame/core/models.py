@@ -40,7 +40,6 @@ class Cell(object):
   
   @visuals.setter
   def visuals(self, val):
-    ic(val)
     if isinstance(val, int) :
       val = (val,)
     if val is None :
@@ -131,7 +130,6 @@ class CellGrid(np.ndarray):
     return np.frompyfunc(lambda x: getattr(x, k), nin=1, nout=1)(self)
 
   def __setattr__(self, k, v):
-    ic(v)
     if k not in self.__dict__ :
       np.frompyfunc(lambda x, y: setattr(x, k, y), nin=2, nout=0)(self, v)
 
@@ -150,6 +148,8 @@ def Visual():
   _visual_count += 1
   return rv
 
+class EntityHasNoGrid(RuntimeError):
+  pass
 
 class Entity(object):
   """
@@ -158,9 +158,10 @@ class Entity(object):
   """
 
   def __init__(self, cell:Cell = None):
-    if not hasattr(self.__class__, 'visuals') :
+    if not hasattr(self, 'visuals') :
       self.visuals = []
     self._cell = None
+    self._grid = None
     self.cell = cell
     
   @property
@@ -170,9 +171,13 @@ class Entity(object):
   @cell.setter
   def cell(self, new_cell:Cell|Pos_t):
     if isinstance(new_cell, tuple) :
-      new_cell = self.cell.grid.cell(Pos(*new_cell))
+      if self._grid is None :
+        raise EntityHasNoGrid("The entity has never been assigned a cell and does not know the grig into it should look for a cell at the specified position")
+      new_cell = self._grid.cell(Pos(*new_cell))
     elif isinstance(new_cell, Pos_t) :
-      new_cell = self.cell.grid.cell(new_cell)
+      if self._grid is None :
+        raise EntityHasNoGrid("The entity has never been assigned a cell and does not know the grig into it should look for a cell at the specified position")
+      new_cell = self._grid.cell(new_cell)
     self.addToCell(new_cell)
 
   def addToCell(self, new_cell:Cell):
@@ -183,8 +188,10 @@ class Entity(object):
       self._cell.update()
     self._cell = new_cell
     if self._cell :
+      self._grid = self._cell.grid
       self._cell.entities.add(self)
       self._cell.update()
+      
 
   def removeFromCell(self, cell:Cell):
     self.addToCell(None)
@@ -200,12 +207,16 @@ class Entity(object):
     if self.cell is not None :
       self.cell = self.cell + pos
     return self
-
+  
   move = __iadd__
 
   @property
   def pos(self):
-    return self.cell.pos if self.pos is not None else None
+    return self.cell.pos if self.cell is not None else None
+
+  @pos.setter
+  def pos(self, val):
+    self.cell = val
 
 class View(object):
   """
