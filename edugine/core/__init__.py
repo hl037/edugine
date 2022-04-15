@@ -5,6 +5,8 @@ from collections import defaultdict
 from threading import Thread
 import numpy as np
 
+from icecream import ic
+
 
 try :
   import edugine.mouse as M
@@ -63,11 +65,11 @@ class Controller(object):
   """
   def __init__(self):
     self.tread = None
-    self.fps = 60
+    self.fps = 15
     self.running = True
     self.keyDownListeners = defaultdict(lambda : [])
     self.keyUpListeners = defaultdict(lambda : [])
-    self.tickListener = []
+    self.tickListeners = []
     self.mouseDownListeners = defaultdict(lambda : [])
     self.mouseUpListeners = defaultdict(lambda : [])
     self.cur_time = None
@@ -103,7 +105,6 @@ class Controller(object):
     while self.running :
       #self.tick(due_time - base)
       self.tick(self._spf)
-      self.render()
       if cur_time < due_time :
         self.render()
         # else : lag
@@ -215,11 +216,11 @@ class Controller(object):
   
   #Tick
   def addTickListener(self, cb):
-    self.mouseUpListeners.append(cb)
+    self.tickListeners.append(cb)
     return cb
     
   def removeTickListener(self, cb):
-    self.mouseUpListeners.remove(cb)
+    self.tickListeners.remove(cb)
     return cb
 
   def onTick(self):
@@ -227,7 +228,7 @@ class Controller(object):
 
   def tick(self, due_time:float):
     self.cur_time = due_time
-    for t in self.tickListener :
+    for t in self.tickListeners :
       t(due_time)
       
   def dispatchEvents(self):

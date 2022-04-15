@@ -170,7 +170,7 @@ class Entity(object):
   @cell.setter
   def cell(self, new_cell:Cell|Pos_t):
     if isinstance(new_cell, tuple) :
-      new_cell = self.cell.grid.cell(Pos(new_cell))
+      new_cell = self.cell.grid.cell(Pos(*new_cell))
     elif isinstance(new_cell, Pos_t) :
       new_cell = self.cell.grid.cell(new_cell)
     self.addToCell(new_cell)
