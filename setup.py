@@ -46,6 +46,15 @@ setup(
     #package_data={
     #  'module' : ['module/path/to/data', 'path/to/glob/*'],
     #},
-    classifiers=[],
+    classifiers=[
+      'Development Status :: 3 - Alpha',
+      'Intended Audience :: Education',
+      'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+      'Operating System :: OS Independent',
+      'Programming Language :: Python',
+      'Topic :: Games/Entertainment',
+      'Topic :: Games/Entertainment :: Arcade',
+      'Topic :: Software Development :: Libraries :: Application Frameworks',
+    ],
     **EXTRAS
 )
