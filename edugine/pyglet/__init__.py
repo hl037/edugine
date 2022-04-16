@@ -8,7 +8,7 @@ from pyglet import gl
 
 sys.modules['edugine.keyboard'] = K
 sys.modules['edugine.mouse'] = M
-M.ALL = M.LEFT & M.MIDDLE & M.RIGHT
+M.ALL = M.LEFT | M.MIDDLE | M.RIGHT
 
 
 

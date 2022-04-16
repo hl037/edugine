@@ -170,6 +170,7 @@ class Controller(object):
   def addMouseDownListener(self, cb:MouseHandler, buttons:int|None=None):
     if buttons is None :
       buttons = M.ALL
+
     for b in (M.LEFT, M.RIGHT, M.LEFT) :
       if buttons & b :
         self.mouseDownListeners[b].append(cb)

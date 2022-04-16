@@ -296,6 +296,10 @@ class GridGame(object):
     self.onKeyUp = self.controller.onKeyUp
     self.onTick = self.controller.onTick
 
+    self.addGlobalMouseDownListener(self.mouseDown)
+    self.addGlobalMouseUpListener(self.mouseUp)
+
+
   def mouseDown(self, pos:Pos_t, button):
     self.gridController.mouseDown(self.view.mapToCell(pos), button)
     
